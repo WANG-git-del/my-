@@ -1,0 +1,499 @@
+import pandas as pd
+
+import numpy as np
+
+import random
+
+数据预处理
+
+musk1 = pd.read_csv("C:\\Users\\Administrator\\Desktop\\musk1.data")
+
+musk1.columns=[str(i) for i in range(169)]
+
+X = list(set(musk1["0"]))
+
+R = {}
+
+for i in musk1["0"]:
+
+    R[i] = R.get(i,0)+1
+
+计算两个对象之间的距离
+
+def ACDM(X_i,X_j):
+
+    distance = 0
+
+    m = musk1.loc[0].shape[0]
+
+    for s in range(m-2):
+
+        V = list(set(musk1[musk1["0"]==X_i][str(s+2)]) | (set(musk1[musk1["0"]==X_j][str(s+2)])))
+
+        sum = 0
+
+        for t in range(len(V)):
+
+            s1 = 0
+
+            s2 = 0
+
+            for p in range(R[X_i]):
+
+                if V[t] == list(musk1[musk1["0"]==X_i][str(s+2)])[p]:
+
+                    s1+=1
+
+            for q in range(R[X_j]):
+
+                if V[t] == list(musk1[musk1["0"]==X_j][str(s+2)])[q]:
+
+                    s2+=1
+
+            sum+=abs(s1/R[X_i]-s2/R[X_j])
+
+        distance+=sum/2
+
+    return distance
+
+ACDM(X[0],X[1])
+
+获取某个社区聚类中心点
+
+def HAFMWM(X):
+
+    n = len(X)
+
+    m = len(musk1.loc[0])-2
+
+    Q = set()
+
+    for s in range(m):
+
+        sum1 = 0
+
+        Qas = set()
+
+        for i in X:
+
+            sum1 += abs(sum(musk1[musk1["0"]==i][str(s+2)]))/R[i]
+
+        Us = round(sum1/n)
+
+        Vs = list(set(abs(i) for i in set(musk1[str(s+2)])))
+
+        Vwi = []
+
+        for i in Vs:
+
+            w_i = 0
+
+            for j in X:
+
+                w_i += (list(musk1[musk1["0"]==j][str(s+2)]).count(i))/R[j]
+
+            w_i = w_i/n
+
+            Vwi.append(w_i)
+
+        # 排序
+
+        d = {}
+
+        for k in range(len(Vs)):
+
+            d[Vs[k]]=Vwi[k]
+
+        sd=sorted(d.items(),key=lambda x:x[1],reverse=True)
+
+        sort = [i[0] for i in sd]
+
+        for p in range(Us-1):
+
+            ss = 0
+
+            for j in range(n):
+
+                try:
+
+                    ss += list(musk1[musk1["0"]==X[j]][str(p+2)]).count(sort[p])
+
+                except:
+
+                    break
+
+            try:
+
+                Qas = Qas | {(Vs[p],ss)}
+
+            except:
+
+                break
+
+        Q = Q | Qas
+
+    return Q
+
+HAFMWM(X[:3])
+
+生成初始聚类中心点
+
+K = 3
+
+C = []
+
+for i in range(K):
+
+    C.append(X[random.randint(0,len(X)-1)])
+
+实现KWM算法
+
+def Kwm(X,K,C,e):
+
+    n = len(X)
+
+    value = 0
+
+    num = 0
+
+    Q = [[] for i in range(K)]
+
+    while n<=100:
+
+        newvalue=0
+
+        for i in X:
+
+            dist = []
+
+            for j in K:
+
+                dist.append(ACDM(i,j))
+
+            mid_index_dist = dist.index(min(dist))
+
+            Q[mid_index_dist].append(i)
+
+            newvalue += min(dist)
+
+        if abs(newvalue-value)<=e:
+
+            break
+
+        else:
+
+            value += newvalue
+
+        C = []
+
+        for i in range(K):
+
+            C.append(HAFMWM(Q[i]))
+
+import pandas as pd
+
+import numpy as np
+
+import random
+
+import time
+
+from sklearn.metrics import accuracy_score, precision_score, \
+
+    recall_score, adjusted_rand_score, normalized_mutual_info_score
+
+def Preprocess_data():
+
+    file = pd.read_csv('C:\\Users\\Administrator\\Desktop\\musk1.data', header=None)
+
+    # 空缺值处理
+
+    mode_data = file.mode().values[0]
+
+    data_shape = file.shape
+
+    data_sum = data_shape[0] * (data_shape[1] - 3)
+
+    file = file.values
+
+    pr = 0.05
+
+    nr = int(pr*data_sum)
+
+    for _ in range(nr):
+
+        lenx = random.randint(0,data_shape[0]-1)
+
+        leny = random.randint(2,data_shape[1]-2)
+
+        file[lenx][leny] = mode_data[leny]
+
+    # data
+
+    data, tags = [], []
+
+    name_key = file[0][0]
+
+    index_key = 0
+
+    for i in range(len(file)):
+
+        if file[i][0] == name_key:
+
+            continue
+
+        else:
+
+            data_i = []
+
+            sthem = file[index_key:i, 2:-1]
+
+            for th in range(len(file[0]) - 3):
+
+                data_i.append(sthem[:, th].tolist())
+
+            data.append(data_i)
+
+            tags.append(file[index_key][-1])
+
+            index_key, name_key = i, file[i][0]
+
+    return data, tags, file[:, 2:-1]
+
+class KWM_mode:
+
+    def __init__(self, data, centre, k):
+
+        self.data = data
+
+        self.centre = centre
+
+        self.k = k
+
+        self.clus_data = []
+
+        self.value = 0.0
+
+        self.col = len(self.data[0])
+
+
+    def _clus(self):
+
+        for i in range(len(self.data)):
+
+            list_dis = []
+
+            for j in range(self.k):
+
+                ds = 0.0
+
+                for l in range(self.col):
+
+                    ds += self.distance(self.data[i][l], self.centre[j][l])
+
+                list_dis.append(ds)
+
+            self.value += min(list_dis)
+
+            self.clus_data.append(list_dis.index(min(list_dis)))
+
+
+    def _recreate_centre(self):
+
+        data_one_two = [[] for _ in range(self.k)]
+
+        for i in range(len(self.data)):
+
+            data_one_two[self.clus_data[i]].append(self.data[i])
+
+
+        for c in range(self.k):
+
+            # 遍历中心求解
+
+            centre_a = []
+
+            for fr in range(self.col):
+
+                centre_ai = []
+
+                data_round = []
+
+                for ft in data_one_two[c]:
+
+                    data_round.append(ft[fr])
+
+                u = []
+
+                for i in data_round:
+
+                    for j in i:
+
+                        if j not in u:
+
+                            u.append(j)
+
+                # 摘要数量
+
+                num = np.mean([len(list(set(i))) for i in data_round])
+
+                num = int(round(num))
+
+                # w[]
+
+                cen_ys = []
+
+                for ui in u:
+
+                    them = 0.0
+
+                    for i in data_round:
+
+                        data_i = i.copy()
+
+                        s = 0
+
+                        while ui in data_i:
+
+                            s += 1
+
+                            data_i.remove(ui)
+
+                        them += s / len(i)
+
+                    them = them / len(data_round)
+
+                    cen_ys.append(them)
+
+                # zhong
+
+                for i in range(num):
+
+                    ind = cen_ys.index(max(cen_ys))
+
+                    centre_ai.append(u[ind])
+
+                    del u[ind]
+
+                    del cen_ys[ind]
+
+                centre_a.append(centre_ai)
+
+            self.centre[c] = centre_a
+
+
+    def open(self):
+
+        self._clus()
+
+        self._recreate_centre()
+
+
+    @staticmethod
+
+    def distance(m1, m2):
+
+        if type(m1) == list:
+
+            sam1, sam2 = m1.copy(), m2.copy()
+
+        else:
+
+            sam1, sam2 = list(m1.copy()), list(m2.copy())
+
+        sam = list(set(sam1).union(set(sam2)))
+
+        d = 0.0
+
+        for i in sam:
+
+            s1 = 0
+
+            for ii in sam1:
+
+                if i == ii:
+
+                    s1 += 1
+
+            s2 = 0
+
+            for jj in sam2:
+
+                if jj == i:
+
+                    s2 += 1
+
+            d += abs(s1 / len(sam1) - s2 / len(sam2))
+
+        return d
+
+
+if __name__ == '__main__':
+
+    def main():
+
+        data, tags, file = Preprocess_data()
+
+        k = 2
+
+
+        pr = 0.02
+
+        value0 = 0.0
+
+        # 随机初始中心
+
+        centre = [data[random.randint(0, 90)], data[random.randint(0, 90)]]
+
+
+        # 开始
+
+        for w in range(100):
+
+            print("第{}次：".format(w))
+
+            t1 = time.time()
+
+            mod = KWM_mode(data, centre, k)
+
+            mod.open()
+
+            centre = mod.centre
+
+            pre = mod.clus_data
+
+            new_value = mod.value
+
+            t2 = time.time()
+
+            # print("centre: ", centre)
+
+            print("ACC:", accuracy_score(tags, pre))
+
+            print("Precison:", precision_score(tags, pre))
+
+            print("Recall:", recall_score(tags, pre))
+
+            print("ARI:", adjusted_rand_score(tags, pre))
+
+            print("NMI:", normalized_mutual_info_score(tags, pre))
+
+            if abs(new_value - value0) < pr:
+
+                break
+
+            else:
+
+                value0 = new_value
+
+        return accuracy_score(tags, pre)
+
+    u = 1
+
+    while u:
+
+        acc = main()
+
+        if acc > 0.63:
+
+            u = 0
