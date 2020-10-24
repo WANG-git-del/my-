@@ -1,0 +1,233 @@
+
+import math
+
+import random
+
+from math import sqrt
+
+import numpy as np
+
+from sklearn import datasets
+
+def euler_distance(point1, point2):
+
+    """
+
+    计算两点之间的欧式距离，支持多维
+
+    """
+
+    distance = 0.0
+
+    for a, b in zip(point1, point2):
+
+        distance += math.pow(a - b, 2)
+
+    return math.sqrt(distance)
+
+#计算最小距离
+
+def get_closest_dist(point, centroids):
+
+    min_dist = math.inf  # 初始设为无穷大
+
+    for i, centroid in enumerate(centroids):
+
+        dist = euler_distance(centroid, point)
+
+        if dist < min_dist:
+
+            min_dist = dist
+
+    return min_dist
+
+
+def kpp_centers(data_set, k):
+
+    """
+
+    从数据集中返回 k 个对象可作为质心
+
+    """
+
+    cluster_centers = []
+
+    cluster_centers.append(random.choice(data_set))
+
+    d = [0 for _ in range(len(data_set))]
+
+    for _ in range(1, k):
+
+        total = 0.0
+
+        for i, point in enumerate(data_set):
+
+            d[i] = get_closest_dist(point, cluster_centers) # 与最近一个聚类中心的距离
+
+            total += d[i]
+
+        total *= random.random()
+
+        for i, di in enumerate(d): # 轮盘法选出下一个聚类中心；
+
+            total -= di
+
+            if total > 0:
+
+                continue
+
+            cluster_centers.append(data_set[i])
+
+            break
+
+    return cluster_centers
+
+#计算欧式距离
+
+def eucDistance(vec1,vec2):
+
+    return sqrt(sum(pow(vec2-vec1,2)))
+
+​
+
+#初始聚类中心选择
+
+def initCentroids(dataSet,k):
+
+    numSamples,dim = dataSet.shape
+
+    centroids = np.zeros((k,dim))
+
+    for i in range(k):
+
+        index = int(np.random.uniform(0,numSamples))
+
+        centroids[i,:] = dataSet[index,:]
+
+    return centroids
+
+​
+
+#K-means聚类算法，迭代
+
+def kmeans(dataSet,k,cent=kpp_centers):
+
+    numSamples = dataSet.shape[0]
+
+    clusterAssement = np.mat(np.zeros((numSamples,2)))
+
+    clusterChanged = True
+
+    #  初始化聚类中心
+
+    centroids = np.array(cent(datasets.load_iris().data,k))
+
+    while clusterChanged:
+
+        clusterChanged = False
+
+        for i in range(numSamples):
+
+            minDist = 100000.0
+
+            minIndex = 0
+
+            # 找到哪个与哪个中心最近
+
+            for j in range(k):
+
+                distance = eucDistance(centroids[j,:],dataSet[i,:])
+
+                if distance<minDist:
+
+                    minDist = distance
+
+                    minIndex = j
+
+              # 更新簇
+
+            clusterAssement[i,:] = minIndex,minDist**2
+
+            if clusterAssement[i,0]!=minIndex:
+
+                clusterChanged = True
+
+         # 坐标均值更新簇中心
+
+        for j in range(k):
+
+            pointsInCluster = dataSet[np.nonzero(clusterAssement[:0].A==j)[0]]
+
+            centroids[j,:] = np.mean(pointsInCluster,axis=0)
+
+    return clusterAssement
+
+
+'''手肘法 理论 手肘法的评价K值好坏的标准是SSE（sum of the squared errors） SSE=∑p∈Ci|p−mi|2
+
+其中 Ci代表第i个簇，p是簇Ci里的样本点，mi是簇的质心。
+
+手肘法的核心思想是： 随着聚类数k的增大，样本划分会更加精细，每个簇的聚合程度会逐渐提高，那么误差平方和SSE自然会逐渐变小。并且，当k小于最佳聚类数时，由于k的增大会大幅增加每个簇的聚合程度，故SSE的下降幅度会很大，而当k到达最佳聚类数时，再增加k所得到的聚合程度回报会迅速变小，所以SSE的下降幅度会骤减，然后随着k值的继续增大而趋于平缓，也就是说SSE和k的关系图是一个手肘的形状，而这个肘部对应的k值就是数据的最佳聚类数。这也是该方法被称为手肘法的原因。
+'''
+def kcSSE(data,cluster = kmeans,k = 10):
+
+    n = data.shape[1]
+
+    SSE = []
+
+    for i in range(2,k+1):
+
+        result = cluster(data,i)
+
+        SSE.append(np.array(result)[:,1].sum())
+
+    lis = []
+
+    for i in range(len(SSE)-1):
+
+        lis.append(SSE[i]-SSE[i+1])
+
+    in_max = lis.index(max(lis))
+
+    if SSE[in_max]<SSE[in_max+1]:
+
+        kk = SSE.index(SSE[in_max])
+
+    else:
+
+        kk = SSE.index(SSE[in_max])+1
+
+    K = kk + 2
+
+    return K
+
+kmeans(datasets.load_iris().data,kcSSE(datasets.load_iris().data))
+def avg():
+
+    nums = []
+
+    iNumStr = input("请输入一个数字(直接输入回车退出): ")
+
+    while iNumStr != "":
+
+        nums.append(eval(iNumStr))
+
+        iNumStr = input("请输入数字(直接输入回车退出): ")
+
+    s=sorted(nums)
+
+    del s[0]
+
+    del s[-1]
+
+    sum=0
+
+    for i in s:
+
+        sum=sum+i
+
+    av=sum/len(s)
+
+    return  av
+
+avg()
