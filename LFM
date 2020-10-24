@@ -1,0 +1,980 @@
+import random
+
+import networkx as nx
+
+import pandas as pd
+
+import matplotlib.pyplot as plt
+
+import zipfile
+
+import pandas as pd
+
+from sklearn.metrics.cluster import normalized_mutual_info_score
+
+import networkx as nx
+
+#import urllib.request as urllib
+
+class Community():
+
+    ''' use set operation to optimize calculation '''
+
+    
+
+    def __init__(self,G,alpha=1.0):
+
+        self._G = G
+
+        self._alpha = alpha
+
+        self._nodes = set()
+
+        self._k_in = 0
+
+        self._k_out = 0
+
+    def add_node(self,node):
+
+        neighbors = set(self._G.neighbors(node))
+
+        #print("添加令居节点",neighbors , self._nodes,neighbors & self._nodes)
+
+        node_k_in = len(neighbors & self._nodes)#neighbor和self._nodes公有节点的数目存入node_k_in
+
+        #print("node_k_in",node_k_in)
+
+        node_k_out = len(neighbors) - node_k_in
+
+        #print("node_k_out",node_k_out)
+
+        self._nodes.add(node)
+
+        self._k_in += 2*node_k_in
+
+        self._k_out = self._k_out+node_k_out-node_k_in
+
+        
+
+    def remove_node(self,node):
+
+        neighbors = set(self._G.neighbors(node))
+
+        community_nodes = self._nodes
+
+        #print("community_nodes",community_nodes)
+
+        node_k_in = len(neighbors & community_nodes)
+
+        node_k_out = len(neighbors) - node_k_in
+
+        self._nodes.remove(node)
+
+        self._k_in -= 2*node_k_in
+
+        self._k_out = self._k_out - node_k_out+node_k_in
+
+        
+
+    def cal_add_fitness(self,node):#fitness适应度
+
+        neighbors = set(self._G.neighbors(node))
+
+        old_k_in = self._k_in
+
+        old_k_out = self._k_out
+
+        vertex_k_in = len(neighbors & self._nodes)#vertex顶点
+
+        vertex_k_out = len(neighbors) - vertex_k_in 
+
+        new_k_in = old_k_in + 2*vertex_k_in
+
+        new_k_out = old_k_out + vertex_k_out-vertex_k_in
+
+        new_fitness = new_k_in/(new_k_in+new_k_out)**self._alpha#幂次
+
+        old_fitness = old_k_in/(old_k_in+old_k_out)**self._alpha
+
+        return new_fitness-old_fitness
+
+    
+
+    def cal_remove_fitness(self,node):
+
+        neighbors = set(self._G.neighbors(node))
+
+        new_k_in = self._k_in
+
+        new_k_out = self._k_out
+
+        node_k_in = len(neighbors & self._nodes)
+
+        node_k_out = len(neighbors) - node_k_in
+
+        old_k_in = new_k_in - 2*node_k_in
+
+        old_k_out = new_k_out - node_k_out + node_k_in
+
+        old_fitness = old_k_in/(old_k_in+old_k_out)**self._alpha 
+
+        new_fitness = new_k_in/(new_k_in+new_k_out)**self._alpha
+
+        return new_fitness-old_fitness
+
+    
+
+    def recalculate(self):
+
+        for vid in self._nodes:
+
+            fitness = self.cal_remove_fitness(vid)
+
+            if fitness < 0.0:
+
+                return vid
+
+        return None
+
+    
+
+    def get_neighbors(self):
+
+        neighbors = set()
+
+        for node in self._nodes:
+
+            neighbors.update(set(self._G.neighbors(node)) - self._nodes)
+
+        return neighbors
+
+    
+
+    def get_fitness(self):
+
+        return float(self._k_in)/((self._k_in+self._k_out) ** self._alpha)
+
+
+class LFM():
+
+    
+
+    def __init__(self, G, alpha):
+
+        self._G = G
+
+        self._alpha = alpha
+
+        
+
+    def execute(self):
+
+        communities = []
+
+        #print("嘿嘿",list(self._G.node.keys()))
+
+        #print("---------------------")
+
+        node_not_include = list(self._G.node.keys())
+
+        while(len(node_not_include) != 0):
+
+            c = Community(self._G, self._alpha)
+
+            #print("self._alpha",self._alpha)#0.9
+
+            # randomly select a seed node
+
+            seed = random.choice(node_not_include)
+
+            c.add_node(seed)
+
+            #print("随机选取节点是：",seed)
+
+            to_be_examined = c.get_neighbors()
+
+            #print("c.get_neighbors()",c.get_neighbors())
+
+            while(to_be_examined):
+
+                #largest fitness to be added
+
+                m = {}
+
+                for node in to_be_examined:
+
+                    fitness = c.cal_add_fitness(node)#计算点的适应度》0加入，小于0删除
+
+                    m[node] = fitness
+
+                to_be_add = sorted(m.items(),key=lambda x:x[1],reverse = True)[0]#啥意思？？？
+
+                 #适应度降序排列
+
+                #stop condition
+
+                if(to_be_add[1] < 0.0):
+
+                    break
+
+                c.add_node(to_be_add[0])
+
+                to_be_remove = c.recalculate()
+
+                while(to_be_remove != None):
+
+                    c.remove_node(to_be_remove)
+
+                    to_be_remove = c.recalculate()
+
+                    
+
+                to_be_examined = c.get_neighbors()
+
+                                     
+
+            for node in c._nodes:
+
+                if(node in node_not_include):
+
+                    node_not_include.remove(node)
+
+            communities.append(c._nodes)
+
+        return communities
+
+
+ ls = []
+
+for i in range(10):
+
+    G = nx.read_edgelist('network6.edgelist', nodetype=int, data=(('weight',float),))
+
+    algorithm = LFM(G,0.9)
+
+    communities = algorithm.execute()
+
+    c = []
+
+    for i in communities:
+
+        for j in i:
+
+            c.append(j)
+
+    c = set(c)
+
+    a1 = []
+
+    for m in c:
+
+        for i in range (len(communities)):
+
+            for j in communities[i]:
+
+                if m==j:
+
+                    a1.append(i+1)
+
+    a1.sort()
+
+
+    ture_label = pd.read_csv("community6.dat",delimiter="\t",header=None)[1]
+
+    pred_label = a1[:3000]
+
+    nmi = normalized_mutual_info_score(ture_label,pred_label)
+
+    ls.append(nmi)
+
+max(ls)
+
+result = []
+
+for i in range(10):
+
+    G = nx.read_edgelist('network6.edgelist', nodetype=int, data=(('weight',float),))
+
+    algorithm = LFM(G,0.9)
+
+    communities = algorithm.execute()
+
+    ls = []
+
+    for c in communities:
+
+        ls.append(c)
+
+    B = []
+
+    for i in ls:
+
+        for j in list(i):
+
+            B.append(j)
+
+    ture_label = pd.read_csv("community6.dat",delimiter="\t",header=None)[1]
+
+    list1=B
+
+    B=[]
+
+    for i in list1:
+
+        if i not in B:
+
+            B.append(i)
+
+    pred_label = B
+
+    nmi = normalized_mutual_info_score(ture_label,pred_label)
+
+    result.append(nmi)
+
+print(result)
+
+for i  in ls[0]:
+
+    print(i)
+
+# -*- coding: utf-8 -*-
+
+"""
+
+Created on Mon Mar  9 21:08:00 2020
+
+
+@author: qz
+
+"""
+
+import networkx as nx
+
+import pandas as pd
+
+from networkx import DiGraph
+
+from networkx import Graph
+
+from networkx.algorithms import approximation as approx
+
+import math
+
+
+#得到边权重的定义：
+
+def get_weight(data):
+
+    #print('正在运行...')
+
+    sum1,avg = 0,0
+
+    numb_edge = nx.number_of_edges(data)
+
+    #dict1字典放置re
+
+    dict1 = {}
+
+    for edge in data.edges:
+
+        leni = len(data[edge[0]])
+
+        lenj = len(data[edge[1]])
+
+        maxn = max(leni,lenj)
+
+        minn = min(leni,lenj)
+
+        nei_ij = 0
+
+        nei_ij = len(list(nx.common_neighbors(data,edge[0],edge[1])))
+
+        re = 0
+
+        re = a*nei_ij*nei_ij/minn/minn + b*nei_ij*nei_ij/maxn/maxn + (1-a-b)*data[edge[0]][edge[1]]['value']
+
+        dict1[edge] = re
+
+        sum1 += re
+
+    avg = sum1/numb_edge
+
+    for edge in data.edges:
+
+        #print(data[edge[0]][edge[1]]['value'])
+
+        data[edge[0]][edge[1]]['value'] = 0.2 + 0.8*dict1[edge]/avg
+
+        #print(data[edge[0]][edge[1]]['value'])
+
+​
+
+#得到节点的加权度
+
+def get_node_weight(data):
+
+    #print('正在运行...')
+
+    re = 0
+
+    node_weight = {}
+
+    for node in data.nodes:
+
+        list1 = data[node]
+
+        sum1 = 0
+
+        for nodej in list1:
+
+            kj = len(data[nodej])
+
+            re = data[node][nodej]['value']
+
+            re *= kj
+
+            sum1 += re
+
+        node_weight[node] = sum1
+
+    return node_weight
+
+        
+
+#得到社区节点的邻接节点集合：
+
+def get_nei(data,list1):
+
+    #print('正在运行...')
+
+    re = set()
+
+    for node in list1:  
+
+        list2 = list(data[node])
+
+        for node2 in list2:
+
+            if node2 in list1:
+
+                continue
+
+            else:
+
+                re.add(node2)
+
+    return re
+
+#得到某节点对社区的适应度：
+
+def get_estimate(node,ct):
+
+    #print('正在运行...')
+
+    ns = len(ct)
+
+    ms,sum_weight,re = 0,0,0
+
+    for edge in data.edges:
+
+        list0 = edge
+
+        sum_weight += data[list0[0]][list0[1]]['value']
+
+    for v in ct:
+
+        list1 = list(data[v])
+
+        for v2 in ct:
+
+            if v2 == v:
+
+                continue
+
+            else:
+
+                if v2 in list1:
+
+                    ms += 1
+
+                    re += data[v][v2]['value']
+
+    ms /=2
+
+    re /=2
+
+    result = re - 1/2/m*(ns*(ns-1)-2*ms)*sum_weight
+
+    return result
+
+    
+
+#步骤四：种子节点的拓展：
+
+def node_expand(root,t):
+
+    print('正在运行...')
+
+    ct = []
+
+    ct.append(root)
+
+    while 1:
+
+        ct2 = ct
+
+        N = get_nei(data,ct)
+
+    #节点与社区的影响度字典：
+
+        estimate = {}
+
+        for n in N:
+
+            ct.append(n)
+
+            f1 = get_estimate(n,ct)
+
+            ct.remove(n)
+
+            f2 = get_estimate(n,ct)
+
+            estimate[n] = f1 - f2
+
+            '''
+
+        if estimate == []:
+
+            print('为空时的列表为：{}'.format(ct))
+
+            '''
+
+    #对N（Ct）内部节点按照影响度进行排序：
+
+        estimate =  sorted(estimate.items(),key = lambda x:x[1],reverse = True)
+
+        if estimate == []:
+
+            break
+
+        if estimate[0][1] > 0: 
+
+            ct.append(estimate[0][0])
+
+        else:
+
+            #print('小于0退出')
+
+            break
+
+    return ct
+
+                
+
+#对F集合中的节点加权度进行排序：
+
+def get_max_weight_inF(F): 
+
+    #print('正在运行...')
+
+    get_weight(data)
+
+    node_weight = get_node_weight(data)
+
+    dict1 = {}
+
+    for node in F:
+
+        dict1[node] = node_weight[node]
+
+    dict1 = sorted(dict1.items(),key = lambda x:x[1],reverse = True)
+
+    return dict1[0][0]
+
+
+#得到节点对社区的归属度：
+
+def get_belong(v,ct,d):
+
+    #print('正在运行...')
+
+    sum_w1,sum_w2 = 0,0
+
+    sum_wd1,sum_wd2 = 0,0
+
+    ct.append(v)
+
+    for i in ct:
+
+        i_nei = data[i]
+
+        for j in i_nei:
+
+            if j in ct:
+
+                sum_w2 += data[i][j]['value']
+
+    for node in ct:
+
+        sum_wd2 += node_weight[node]
+
+    ct.remove(v)
+
+    for i in ct:
+
+        i_nei = data[i]
+
+        for j in i_nei:
+
+            if j in ct:
+
+                sum_w1 += data[i][j]['value']
+
+    for node in ct:
+
+        sum_wd1 += node_weight[node]    
+
+    return d*(sum_w1/sum_w2) + (1-d)*(sum_wd1/sum_wd2)
+
+
+#得到模块度：                
+
+def get_EQ():
+
+    print('正在运行...')
+
+    sum1 = 0
+
+    #遍历每个社区
+
+    for ctt in CT:
+
+        #遍历每个节点：
+
+        for i in ctt:
+
+            for j in ctt:
+
+                #flag为是否连通，belong_i为所属社区个数
+
+                re,flag,belong_i,belong_j = 0,0,0,0
+
+                '''
+
+                剔除节点自身
+
+                if i == j:
+
+                    continue
+
+                else:
+
+                    '''
+
+        # 节点所属的社区数目：
+
+                len_i = len(data[i])
+
+                len_j = len(data[j])
+
+                for list1 in CT:
+
+                    if i in list1:
+
+                        belong_i += 1
+
+                    if j in list1:
+
+                        belong_j += 1
+
+                #判断两节点是否连通
+
+                list2 = list(data[i])
+
+                if j in list2:
+
+                    flag = 1
+
+                re = (flag-( len_i  * len_j /2/m ))/(belong_i*belong_j)
+
+                sum1 += re
+
+    return sum1/2/m
+
+#data_2 = pd.read_excel('./karate weighted data2.xlsx') 
+
+#data = nx.karate_club_graph()
+
+#data.add_weighted_edges_from(data_2.values.tolist(),weight = 'value')
+
+data = nx.Graph(nx.read_gml("hep-th.gml"))
+
+
+#data=nx.Graph(nx.read_gml('hep-th.gml'))
+
+
+#n为节点个数
+
+n = nx.number_of_nodes(data)
+
+#m 为边的个数
+
+m = nx.number_of_edges(data)
+
+a = 2*m/n/(n-1)
+
+b = 0.2
+
+V = []
+
+#CT为社区集合，t为社区个数
+
+t = 0
+
+CT= []
+
+c = 0.3
+
+node_weight = {}
+
+
+#得到节点集合
+
+for node in data.nodes:
+
+    V.append(node)
+
+F = V
+
+
+#得到重新定义的权重：
+
+get_weight(data)
+
+#得到各个节点的加权值:
+
+node_weight = get_node_weight(data)
+
+'''
+
+while 1:
+
+    print('正在运行...')
+
+    #步骤二：
+
+    if a < 0:
+
+        print('a<0')
+
+    else:
+
+        C = []
+
+        b = 0.7 - a 
+
+    node_weight_2 = {}
+
+    
+
+    
+
+    
+
+    #步骤四：
+
+    while F!= []:
+
+        #print('正在运行...')
+
+        t += 1
+
+        root = get_max_weight_inF(F)
+
+        F.remove(root)
+
+        ct = node_expand(root,t)
+
+        if len(ct) <= 3:
+
+            t -= 1
+
+            continue
+
+        else:
+
+            for v in ct:
+
+                v_nei = list(data[v])
+
+            for v2 in ct:
+
+                if v2 == v:
+
+                    continue
+
+                else:
+
+                    if v2 in v_nei:
+
+                        data[v][v2]['value'] = data[v][v2]['value']/(math.sqrt(len(ct)))
+
+            for n in ct:
+
+                node_weight_2[n] = 0
+
+                n_nei = list(data[n])
+
+                for v in n_nei:
+
+                    node_weight_2[n] += data[n][v]['value']*len(list(data[v]))
+
+                cr = 1 - node_weight_2[n]/node_weight[n]
+
+                if cr >= c:
+
+                    if n in F: 
+
+                        F.remove(n)
+
+            CT.append(ct)
+
+    flag = 0
+
+    while(flag<200):
+
+        print('正在运行...')
+
+        flag += 1
+
+        CT2 = CT
+
+        for i in CT:
+
+            for j in CT:
+
+        #重叠节点集：
+
+                overlap = []
+
+                if i == j:
+
+                    continue
+
+                min1 = min(len(i),len(j))
+
+                for node in i:
+
+                    if node in j:
+
+                        overlap.append(node)
+
+                #print('min为：{}，len(overlap)为：{}'.format(min1,len(overlap)))
+
+                min1  = min1/2
+
+                if len(overlap) >= min1:
+
+                    for j2 in j:
+
+                        if j2 not in overlap:
+
+                            i.append(j2)
+
+                    CT.remove(j)
+
+        #print('CT为：{}'.format(CT))
+
+        #print('CT2为：{}'.format(CT2))
+
+                    
+
+    if len(CT) >= 1:
+
+        break
+
+    else:
+
+        a -= 0.03
+
+#发现未归类得节点：
+
+        #定义为归类节点集：
+
+d = 0.3
+
+other_node = []
+
+all_node = []
+
+for i in CT:
+
+    for j in i:
+
+        all_node.append(j)
+
+for node in data.nodes:
+
+    if node not in all_node:
+
+        other_node.append(node)
+
+        
+
+miu = 0.7
+
+flag = []
+
+for i in range(len(other_node)):
+
+    flag.append(0)
+
+temp = False
+
+while 1:
+
+    for i in range(len(other_node)):
+
+        max1= 0
+
+        for j in range(len(CT)):
+
+            num = get_belong(other_node[i],CT[j],d)
+
+            if num > max1:
+
+                max1 = num
+
+                flag[i] = j
+
+        if max1 <= miu:
+
+            temp = True
+
+            break
+
+    if temp:
+
+        miu -= 0.1
+
+        continue
+
+    else:
+
+        kk = 0
+
+        other_len = len(other_node)
+
+        for i in range(other_len):
+
+            CT[flag[i]].append(other_node[i])
+
+        break
+
+
+'''
+
+CT =[['BaronessT', 'Cosette', 'Gillenormand', 'LtGillenormand', 'Magnon', 'Marius', 'MlleGillenormand', 'MlleVaubois', 'MmePontmercy', 'Pontmercy', 'Toussaint', 'Woman2'], ['Bahorel', 'BaronessT', 'Bossuet', 'Child1', 'Child2', 'Combeferre', 'Courfeyrac', 'Enjolras', 'Feuilly', 'Gavroche', 'Grantaire', 'Joly', 'Jondrette', 'Mabeuf', 'Marius', 'MmeBurgon', 'MmeHucheloup', 'MotherPlutarch', 'Prouvaire'], ['Bamatabois', 'BaronessT', 'Brevet', 'Champmathieu', 'Champtercier', 'Chenildieu', 'Cochepaille', 'Cosette', 'Count', 'CountessDeLo', 'Cravatte', 'Fantine', 'Fauchelevent', 'Geborand', 'Gervais', 'Gillenormand', 'Gribier', 'Isabeau', 'Javert', 'Judge', 'Labarre', 'LtGillenormand', 'Magnon', 'Marguerite', 'MlleBaptistine', 'MlleGillenormand', 'MlleVaubois', 'MmeDeR', 'MmeMagloire', 'MmePontmercy', 'MmeThenardier', 'MotherInnocent', 'Myriel', 'Napoleon', 'OldMan', 'Perpetue', 'Scaufflaire', 'Simplice', 'Toussaint', 'Valjean', 'Woman1', 'Woman2'], ['Anzelma', 'Babet', 'Boulatruelle', 'Brujon', 'Claquesous', 'Cosette', 'Eponine', 'Gueulemer', 'Javert', 'Magnon', 'MmePontmercy', 'MmeThenardier', 'Montparnasse', 'Pontmercy', 'Thenardier', 'Toussaint', 'Woman1', 'Woman2'], ['Blacheville', 'Dahlia', 'Fameuil', 'Fantine', 'Favourite', 'Listolier', 'Marguerite', 'Perpetue', 'Simplice', 'Tholomyes', 'Zephine']]
+
+print(get_EQ())
+
