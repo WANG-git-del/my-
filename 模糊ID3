@@ -1,0 +1,514 @@
+import numpy as np
+
+import pandas as pd
+
+def distEclud(arrA,arrB):
+
+    d = arrA - arrB
+
+    dist = np.sum(np.power(d,2),axis=1)
+
+    return dist
+
+def randCent(dataSet,k):
+
+    n = dataSet.shape[1]
+
+    data_min = dataSet.iloc[:,:n-1].min()
+
+    data_max = dataSet.iloc[:,:n-1].max()
+
+    data_cent = np.random.uniform(data_min,data_max,(k,n-1))
+
+    return data_cent
+
+def kMeans(dataSet,k,distMeas=distEclud,createCent=randCent):
+
+    m,n = dataSet.shape
+
+    centroids = createCent(dataSet,k)
+
+    clusterAssment = np.zeros((m,3))
+
+    clusterAssment[:,0] = np.inf
+
+    clusterAssment[:,1:3] = -1
+
+    result_set = pd.concat([dataSet,pd.DataFrame(clusterAssment)],axis = 1,ignore_index = True)
+
+    clusterChanged = True
+
+    while clusterChanged:
+
+        clusterChanged = False
+
+        for i in range(m):
+
+            dist = distMeas(dataSet.iloc[i,:n-1].values,centroids)
+
+            result_set.iloc[i,n] = dist.min()
+
+            try:
+
+                result_set.iloc[i,n+1] = np.where(dist == dist.min())[0]
+
+            except:
+
+                continue
+
+        clusterChanged = not (result_set.iloc[:,-1] == result_set.iloc[:,-2]).all()
+
+        if clusterChanged:
+
+            cent_df = result_set.groupby(n+1).mean()
+
+            centroids = cent_df.iloc[:,:n-1].values
+
+            result_set.iloc[:,-1] = result_set.iloc[:,-2]
+
+    return centroids,result_set
+
+def Ms(a,t,k,m_l,a_min,a_max):# 社区特征节点，所要遍历的社区（第几个），社区数量，社区中心（列表）,最值特征点
+
+    m_l.sort()
+
+    t = int(t)
+
+    if (t==0):
+
+        m1 = m_l[0]
+
+        if a_min<=a<=m1:
+
+            ms = 1-(a-m1)*0.5/(a_min-m1)
+
+        elif(m1<=a<=m_l[1]):
+
+            ms = 1-(a-m1)/(m_l[1]-m1)
+
+        else:
+
+            ms = 0
+
+    elif(t==k-1):
+
+        mk = m_l[-1]
+
+        if (m_l[-2]<=a<=mk):
+
+            ms = 1-(a-mk)/(m_l[-2]-mk)
+
+        elif (mk<=a<=a_max):
+
+            ms =1-(a-mk)*0.5/(a_max-mk)
+
+        else:
+
+            ms = 0
+
+    else:
+
+        mt = m_l[t-1]
+
+        m_t = m_l[t-2]
+
+        m__t = m_l[t]
+
+        if (m_t<=a<=mt):
+
+            ms = 1-(a-mt)/(m_t-mt)
+
+        elif (mt<=a<=m__t):
+
+            ms = 1-(a-mt)/(m__t-mt)
+
+        else:
+
+            ms = 0
+
+    return ms
+
+iri = pd.read_csv("segmentation.csv",header = None)
+
+# k 分类数量
+
+k=2
+
+# t_all 特征数量
+
+t_all = 16
+
+#行索引
+
+class_name = ["特征1.1","特征1.2","特征2.1","特征2.2","特征6.1","特征6.2",
+
+              "特征7.1","特征7.2","特征8.1","特征8.2","特征9.1","特征9.2","特征10.1","特征10.2","特征11.1","特征11.2","特征12.1","特征12.2",
+
+              "特征13.1","特征13.2","特征14.1","特征14.2","特征15.1","特征15.2","特征16.1","特征16.2","特征17.1","特征17.2","特征18.1","特征18.2"
+
+             ,"特征19.1","特征19.2"]
+
+​
+
+########以下代码不必改动#########
+
+​
+
+# 存放每个特征的隶属度
+
+temp = {}
+
+key = 0
+
+# 开始计算
+
+for t in range(t_all):
+
+    # 列表iris[特征t，特征t] 换成特征所在的列索引
+
+    iris = iri[[t,t]]
+
+    ###############
+
+    'K-meams聚类'
+
+    iris_cent,iris_result = kMeans(iris,k)
+
+    ###############
+
+    '''初始化所有中心点为列表
+
+       找出节点最值'''
+
+    cent = list(pd.DataFrame(iris_cent)[0])
+
+    a_max = iris_result[0].max()
+
+    a_min = iris_result[0].min()
+
+    value = []
+
+    ###############
+
+    for e_c in range(k):#节点遍历每个社区中心值
+
+        for i in range(iris_result.shape[0]):# 每个节点遍历特定社区中心值
+
+            value.append(Ms(iris_result[0][i],e_c,k,cent,a_min,a_max))
+
+        temp[class_name[key]] = value
+
+        key+=1
+
+        value = []
+
+result = pd.DataFrame(temp)
+
+iris_cent,iris_result = kMeans(iris,k)
+
+import pandas as pd
+
+import matplotlib.pyplot as plt
+
+data = pd.read_excel("倒置2.xlsx",encoding="GBK")
+
+list(data["月份"])
+
+mestamp('2019-09-01 00:00:00')]
+
+import numpy as np
+
+import matplotlib.pyplot as plt
+
+ 
+
+#定义x、y散点坐标
+
+x = data["月份"]
+
+x = np.array(x)
+
+print('x is :\n',x)
+
+num = [174,236,305,334,349,351,342,323]
+
+y = [int(i) for i in data[401]]
+
+print('y is :\n',y)
+
+#用3次多项式拟合
+
+f1 = np.polyfit(x, y, 3)
+
+print('f1 is :\n',f1)
+
+p1 = np.poly1d(f1)
+
+print('p1 is :\n',p1)
+
+#也可使用yvals=np.polyval(f1, x)
+
+yvals = p1(x)  #拟合y值
+
+print('yvals is :\n',yvals)
+
+#绘图
+
+plot1 = plt.plot(x, y, 's',label='original values')
+
+plot2 = plt.plot(x, yvals, 'r',label='polyfit values')
+
+plt.xlabel('x')
+
+plt.ylabel('y')
+
+plt.legend(loc=4) #指定legend的位置右下角
+
+plt.title('polyfitting')
+
+plt.show()
+
+x is :
+ ['2018-10-01T00:00:00.000000000' '2018-11-01T00:00:00.000000000'
+ '2018-12-01T00:00:00.000000000' '2019-01-01T00:00:00.000000000'
+ '2019-02-01T00:00:00.000000000' '2019-03-01T00:00:00.000000000'
+ '2019-04-01T00:00:00.000000000' '2019-05-01T00:00:00.000000000'
+ '2019-06-01T00:00:00.000000000' '2019-07-01T00:00:00.000000000'
+ '2019-08-01T00:00:00.000000000' '2019-09-01T00:00:00.000000000']
+y is :
+ [18390, 18285, 24136, 23254, 19164, 17378, 12646, 15800, 17201, 15136, 16976, 17899]
+
+
+import matplotlib.pyplot as plt
+
+import numpy as np
+
+
+x = data["月份"]
+
+y = data[401]
+
+z1 = np.polyfit(x, y, 3) # 用3次多项式拟合
+
+p1 = np.poly1d(z1)
+
+print(p1) # 在屏幕上打印拟合多项式
+
+yvals=p1(x) # 也可以使用yvals=np.polyval(z1,x)
+
+plot1=plt.plot(x, y, '*',label='original values')
+
+plot2=plt.plot(x, yvals, 'r',label='polyfit values')
+
+plt.xlabel('x axis')
+
+plt.ylabel('y axis')
+
+plt.legend(loc=4) # 指定legend的位置,读者可以自己help它的用法
+
+plt.title('polyfitting')
+
+plt.show()
+
+import numpy as np
+
+import matplotlib.pyplot as plt
+
+import matplotlib.dates as mdates
+
+import datetime as DT
+
+import time
+
+
+dates = data["月份"]
+
+y = data[804]
+
+
+z4 = np.polyfit(x, y, 3)
+
+p4 = np.poly1d(z4)
+
+
+fig, cx = plt.subplots()
+
+
+xx = np.linspace(x.min(), x.max())
+
+dd = mdates.num2date(xx)
+
+
+cx.plot(dd, p4(xx), '-g')
+
+cx.plot(dates, y, '+', color='b', label='blub')
+
+cx.errorbar(dates, y,
+
+             yerr,
+
+             marker='.',
+
+             color='k',
+
+             ecolor='b',
+
+             markerfacecolor='b',
+
+             label="series 1",
+
+             capsize=0,
+
+             linestyle='')
+
+
+cx.grid()
+
+cx.set_ylim(0, 0.03)
+
+plt.show()
+
+import os
+
+import numpy as np
+
+from scipy import log
+
+from scipy.optimize import curve_fit
+
+import matplotlib.pyplot as plt
+
+import math
+
+from sklearn.metrics import r2_score
+
+# 字体
+
+plt.rcParams['font.sans-serif']=['SimHei']
+
+
+# 拟合函数
+
+def func(x, a, b):
+
+#    y = a * log(x) + b
+
+    y = x/(a*x+b)
+
+    return y
+
+
+# 拟合的坐标点
+
+x0 = [i for i in range(data.shape[0])]
+
+y0 = data[401]
+
+
+# 拟合，可选择不同的method
+
+result = curve_fit(func, x0, y0,method='trf')
+
+a, b = result[0]  
+
+
+# 绘制拟合曲线用
+
+x1 = np.arange(2, 48, 0.1)  
+
+#y1 = a * log(x1) + b
+
+y1 = x1/(a*x1+b)
+
+
+x0 = np.array(x0)
+
+y0 = np.array(y0)
+
+# 计算r2
+
+y2 = x0/(a*x0+b)
+
+#y2 = a * log(x0) + b
+
+r2 = r2_score(y0, y2)    
+
+
+#plt.figure(figsize=(7.5, 5)) 
+
+# 坐标字体大小
+
+plt.tick_params(labelsize=11)  
+
+ # 原数据散点
+
+plt.scatter(x0,y0,s=30,marker='o')
+
+
+# 横纵坐标起止
+
+plt.xlim((0, 50))
+
+plt.ylim((0, round(max(y0))+2))
+
+
+# 拟合曲线
+
+plt.plot(x1, y1, "blue")  
+
+plt.title("标题",fontsize=13) 
+
+plt.xlabel('X（h）',fontsize=12)  
+
+plt.ylabel('Y（%）',fontsize=12)  
+
+
+# 指定点，y=9时求x
+
+p = round(9*b/(1-9*a),2)
+
+#p = b/(math.log(9/a))
+
+p =  round(p, 2)
+
+# 显示坐标点
+
+plt.scatter(p,9,s=20,marker='x')
+
+# 显示坐标点横线、竖线
+
+plt.vlines(p, 0, 9, colors = "c", linestyles = "dashed")
+
+plt.hlines(9, 0, p, colors = "c", linestyles = "dashed")
+
+# 显示坐标点坐标值
+
+plt.text(p, 9, (float('%.2f'% p),9),ha='left', va='top', fontsize=11)
+
+# 显示公式
+
+m = round(max(y0)/10,1)
+
+print(m)
+
+plt.text(48, m, 'y= x/('+str(round(a,2))+'*x+'+str(round(b,2))+')', ha='right',fontsize=12)  
+
+plt.text(48, m, r'$R^2=$'+str(round(r2,3)), ha='right', va='top',fontsize=12)  
+
+
+# True 显示网格  
+
+# linestyle 设置线显示的类型(一共四种)  
+
+# color 设置网格的颜色  
+
+# linewidth 设置网格的宽度   
+
+plt.grid(True, linestyle = "--", color = "g", linewidth = "0.5")
+
+plt.show()
+
+data.shape
+
+x0 = [i for i in range(data.shape[0])]
+
